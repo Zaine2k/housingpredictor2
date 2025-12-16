@@ -222,7 +222,6 @@ export default function Page() {
           </div>
 
           <div style={{ marginTop: 12, fontSize: 12, opacity: 0.75 }}>
-            Note: updates are debounced to avoid spamming the API while dragging.
           </div>
         </div>
 
