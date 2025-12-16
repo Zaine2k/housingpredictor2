@@ -39,6 +39,14 @@ const optionStyle: React.CSSProperties = {
   backgroundColor: "#fff",
 };
 
+function formatCurrencyCAD(value: number) {
+  return value.toLocaleString("en-CA", {
+    style: "currency",
+    currency: "CAD",
+    maximumFractionDigits: 0,
+  });
+}
+
 export default function Page() {
   const [landSize, setLandSize] = useState<number>(500);
   const [YEAR_OF_CONSTRUCTION_RANGE, setYEAR_OF_CONSTRUCTION_RANGE] = useState<
@@ -54,9 +62,14 @@ export default function Page() {
   const [pred, setPred] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // For debouncing + canceling in-flight requests
+  // Debounce + cancel in-flight requests
   const debounceTimerRef = useRef<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  // API base URL:
+  // - Set NEXT_PUBLIC_API_URL in Vercel env vars to: https://housingpredictor2.onrender.com
+  // - For local dev, create .env.local with NEXT_PUBLIC_API_URL=http://localhost:8000
+  const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, ""); // remove trailing slash
 
   const payload = useMemo(
     () => ({
@@ -68,7 +81,6 @@ export default function Page() {
     [landSize, YEAR_OF_CONSTRUCTION_RANGE, QUADRANT, PROPERTY_TYPE]
   );
 
-  // Live prediction whenever payload changes
   useEffect(() => {
     // Clear previous debounce timer
     if (debounceTimerRef.current) {
@@ -80,8 +92,18 @@ export default function Page() {
       abortRef.current.abort();
     }
 
-    // Debounce (adjust 250–600ms as desired)
+    // Debounce (200ms = fast; increase if you want fewer requests)
     debounceTimerRef.current = window.setTimeout(async () => {
+      // If missing env var, show a useful error instead of silently failing
+      if (!API_URL) {
+        setLoading(false);
+        setPred(null);
+        setError(
+          "Missing NEXT_PUBLIC_API_URL. Set it in Vercel Environment Variables (e.g., https://housingpredictor2.onrender.com) or in .env.local for local dev."
+        );
+        return;
+      }
+
       const controller = new AbortController();
       abortRef.current = controller;
 
@@ -89,7 +111,7 @@ export default function Page() {
       setError(null);
 
       try {
-        const res = await fetch("http://localhost:8000/predict", {
+        const res = await fetch(`${API_URL}/predict`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -102,10 +124,14 @@ export default function Page() {
         }
 
         const data = (await res.json()) as PredictResponse;
+
+        if (typeof data.predicted_price !== "number" || Number.isNaN(data.predicted_price)) {
+          throw new Error("API returned an invalid predicted_price");
+        }
+
         setPred(data.predicted_price);
       } catch (e: any) {
-        // Ignore abort errors (user changed input quickly)
-        if (e?.name === "AbortError") return;
+        if (e?.name === "AbortError") return; // ignore aborted requests
         setError(e?.message ?? "Unknown error");
         setPred(null);
       } finally {
@@ -113,7 +139,7 @@ export default function Page() {
       }
     }, 200);
 
-    // Cleanup when payload changes/unmounts
+    // Cleanup on change/unmount
     return () => {
       if (debounceTimerRef.current) {
         window.clearTimeout(debounceTimerRef.current);
@@ -122,16 +148,9 @@ export default function Page() {
         abortRef.current.abort();
       }
     };
-  }, [payload]);
+  }, [payload, API_URL]);
 
-  const formatted =
-    pred === null
-      ? "—"
-      : pred.toLocaleString("en-CA", {
-          style: "currency",
-          currency: "CAD",
-          maximumFractionDigits: 0,
-        });
+  const formatted = pred === null ? "—" : formatCurrencyCAD(pred);
 
   return (
     <main
@@ -222,6 +241,13 @@ export default function Page() {
           </div>
 
           <div style={{ marginTop: 12, fontSize: 12, opacity: 0.75 }}>
+            <div>
+              API URL:{" "}
+              <code>{API_URL ?? "NEXT_PUBLIC_API_URL not set"}</code>
+            </div>
+            <div style={{ marginTop: 4 }}>
+              Endpoint: <code>/predict</code>
+            </div>
           </div>
         </div>
 
