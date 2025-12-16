@@ -92,9 +92,8 @@ export default function Page() {
       abortRef.current.abort();
     }
 
-    // Debounce (200ms = fast; increase if you want fewer requests)
+    // Debounce 
     debounceTimerRef.current = window.setTimeout(async () => {
-      // If missing env var, show a useful error instead of silently failing
       if (!API_URL) {
         setLoading(false);
         setPred(null);
@@ -238,16 +237,6 @@ export default function Page() {
                 </option>
               ))}
             </select>
-          </div>
-
-          <div style={{ marginTop: 12, fontSize: 12, opacity: 0.75 }}>
-            <div>
-              API URL:{" "}
-              <code>{API_URL ?? "NEXT_PUBLIC_API_URL not set"}</code>
-            </div>
-            <div style={{ marginTop: 4 }}>
-              Endpoint: <code>/predict</code>
-            </div>
           </div>
         </div>
 
