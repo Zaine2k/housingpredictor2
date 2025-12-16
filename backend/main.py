@@ -4,16 +4,17 @@ from pydantic import BaseModel
 import joblib
 import pandas as pd
 from pathlib import Path
-import numpy as np 
+import numpy as np
 
 app = FastAPI(title="Calgary Housing Price API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000",
-                   "https://housingpredictor2.vercel.app"
-                   ],
-    allow_credentials=True,
+    allow_origins=[
+        "http://localhost:3000",
+        "https://housingpredictor2.vercel.app",
+    ],
+    allow_credentials=False,  
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -27,13 +28,20 @@ class PredictRequest(BaseModel):
     QUADRANT: str
     PROPERTY_TYPE: str
 
+class PredictResponse(BaseModel):
+    predicted_price: float
+
+@app.get("/")
+def root():
+    return {"message": "API running. See /docs. Health: /health. Predict: POST /predict"}
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
-@app.post("/predict")
+@app.post("/predict", response_model=PredictResponse)
 def predict(req: PredictRequest):
     X = pd.DataFrame([req.dict()])
     pred_log = pipeline.predict(X)[0]
     pred_price = float(np.expm1(pred_log))
-    return {"predicted_price": pred_price}
+    return PredictResponse(predicted_price=pred_price)
