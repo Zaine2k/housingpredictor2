@@ -39,6 +39,16 @@ const optionStyle: React.CSSProperties = {
   backgroundColor: "#fff",
 };
 
+const numberInputStyle: React.CSSProperties = {
+  width: 140,
+  padding: 8,
+  backgroundColor: "#fff",
+  color: "#000",
+  border: "1px solid #ccc",
+  borderRadius: 8,
+  outline: "none",
+};
+
 function formatCurrencyCAD(value: number) {
   return value.toLocaleString("en-CA", {
     style: "currency",
@@ -47,8 +57,17 @@ function formatCurrencyCAD(value: number) {
   });
 }
 
+function clamp(n: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, n));
+}
+
 export default function Page() {
+  const LAND_MIN = 50;
+  const LAND_MAX = 2000;
+
   const [landSize, setLandSize] = useState<number>(500);
+  const [landSizeText, setLandSizeText] = useState<string>("500");
+
   const [YEAR_OF_CONSTRUCTION_RANGE, setYEAR_OF_CONSTRUCTION_RANGE] = useState<
     (typeof YEAR_OF_CONSTRUCTION_RANGES)[number]
   >(YEAR_OF_CONSTRUCTION_RANGES[3]);
@@ -69,7 +88,12 @@ export default function Page() {
   // API base URL:
   // - Set NEXT_PUBLIC_API_URL in Vercel env vars to: https://housingpredictor2.onrender.com
   // - For local dev, create .env.local with NEXT_PUBLIC_API_URL=http://localhost:8000
-  const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, ""); // remove trailing slash
+  const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+
+  // Keep the text input in sync when slider or clamping changes landSize
+  useEffect(() => {
+    setLandSizeText(String(landSize));
+  }, [landSize]);
 
   const payload = useMemo(
     () => ({
@@ -92,7 +116,7 @@ export default function Page() {
       abortRef.current.abort();
     }
 
-    // Debounce 
+    // Debounce
     debounceTimerRef.current = window.setTimeout(async () => {
       if (!API_URL) {
         setLoading(false);
@@ -174,17 +198,59 @@ export default function Page() {
         }}
       >
         <div style={{ padding: 16, border: "1px solid #ddd", borderRadius: 12 }}>
-          <label style={{ display: "block", fontWeight: 600 }}>
-            Land Size (sqm): {landSize}
-          </label>
-          <input
-            type="range"
-            min={50}
-            max={2000}
-            value={landSize}
-            onChange={(e) => setLandSize(parseInt(e.target.value, 10))}
-            style={{ width: "100%" }}
-          />
+          {/* Land Size: slider + typed input */}
+          <label style={{ display: "block", fontWeight: 600 }}>Land Size (sqm)</label>
+
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <input
+              type="range"
+              min={LAND_MIN}
+              max={LAND_MAX}
+              value={landSize}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                setLandSize(v);
+              }}
+              style={{ flex: 1, width: "100%" }}
+            />
+
+            <input
+              type="number"
+              inputMode="numeric"
+              min={LAND_MIN}
+              max={LAND_MAX}
+              step={1}
+              value={landSizeText}
+              onChange={(e) => {
+                // Allow intermediate states like "" while typing
+                setLandSizeText(e.target.value);
+
+                // If it's a valid number, update landSize immediately (live updates)
+                const v = Number(e.target.value);
+                if (!Number.isNaN(v) && e.target.value !== "") {
+                  setLandSize(clamp(Math.round(v), LAND_MIN, LAND_MAX));
+                }
+              }}
+              onBlur={() => {
+                // On blur, normalize/clamp or reset to last valid value
+                if (landSizeText.trim() === "") {
+                  setLandSizeText(String(landSize));
+                  return;
+                }
+
+                const v = Number(landSizeText);
+                if (Number.isNaN(v)) {
+                  setLandSizeText(String(landSize));
+                  return;
+                }
+
+                const clamped = clamp(Math.round(v), LAND_MIN, LAND_MAX);
+                setLandSize(clamped);
+                setLandSizeText(String(clamped));
+              }}
+              style={numberInputStyle}
+            />
+          </div>
 
           <div style={{ marginTop: 16 }}>
             <label style={{ display: "block", fontWeight: 600 }}>
