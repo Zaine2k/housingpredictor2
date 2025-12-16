@@ -111,7 +111,7 @@ export default function Page() {
       } finally {
         setLoading(false);
       }
-    }, 400);
+    }, 200);
 
     // Cleanup when payload changes/unmounts
     return () => {
